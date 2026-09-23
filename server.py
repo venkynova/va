@@ -49,6 +49,24 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         from urllib.parse import urlparse, parse_qs
+        if self.path.startswith("/api/research"):
+            try:
+                from urllib.parse import urlparse, parse_qs, quote
+                qs = parse_qs(urlparse(self.path).query)
+                q = qs.get("q", [""])[0].strip()
+                if not q:
+                    self.send_json(400, {"error":"Missing research query"})
+                    return
+                api = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=" + quote(q) + "&format=json&utf8=1&srlimit=5"
+                req = Request(api, headers={"User-Agent":"Venky-Agent/1.0"})
+                with urlopen(req, timeout=20) as resp:
+                    payload = json.loads(resp.read().decode("utf-8"))
+                results = [{"title":x.get("title",""),"snippet":x.get("snippet","")} for x in payload.get("query",{}).get("search",[])]
+                self.send_json(200, {"query":q,"results":results})
+            except Exception as e:
+                self.send_json(502, {"error":"Research request failed: " + str(e)})
+            return
+
         if self.path.startswith("/api/github/files"):
             try:
                 qs = parse_qs(urlparse(self.path).query)
