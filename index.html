@@ -101,7 +101,18 @@ responseText.innerText="🧠 Thinking with local AI...";
 response.style.display="block";
 try{
 let message;
-if (/github|repository|repo|readme|issues|files/i.test(command)) {
+if (/research|search|look up|find out/i.test(command)) {
+  const q = command.replace(/^(research|search|look up|find out)\s*/i, "").trim() || command;
+  const res = await fetch("/api/research?q=" + encodeURIComponent(q));
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Research request failed");
+  const sourceText = (data.results || []).map(x => x.title + ": " + x.snippet).join("\n");
+  message = sourceText ? "Research results for: " + data.query + "\n\n" + sourceText : "No research results found.";
+  try {
+    const summary = await VenkyAI.ask("Summarize these research results in clear bullet points. Mention that they are search snippets, not full source verification.\n\n" + sourceText);
+    message += "\n\n🧠 AI Summary\n" + summary;
+  } catch (_) {}
+} else if (/github|repository|repo|readme|issues|files/i.test(command)) {
   if (/issue/i.test(command)) {
     const res = await fetch("/api/github/issues");
     const data = await res.json();
@@ -141,5 +152,21 @@ document.getElementById("pending").innerText=pending;
 document.getElementById("progress").innerText=percentage+"%";
 }
 </script>
+
+<script>
+(function(){
+  const boxes=[...document.querySelectorAll('.task input[type="checkbox"]')];
+  const key='venky-agent-tasks';
+  try{
+    const saved=JSON.parse(localStorage.getItem(key)||'[]');
+    boxes.forEach((b,i)=>b.checked=!!saved[i]);
+    if(typeof updateReport==='function') updateReport();
+  }catch(e){}
+  boxes.forEach((b,i)=>b.addEventListener('change',()=>{
+    try{localStorage.setItem(key,JSON.stringify(boxes.map(x=>x.checked)))}catch(e){}
+  }));
+})();
+</script>
+
 </body>
 </html>
