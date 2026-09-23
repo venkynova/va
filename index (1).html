@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Venky Agent v1</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#0b0d12;color:#fff;min-height:100vh}
+.container{width:min(1100px,92%);margin:auto;padding:35px 0}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px}
+.logo{font-size:28px;font-weight:800}.logo span{color:#7c5cff}
+.status{background:#151922;border:1px solid #292e3a;padding:9px 14px;border-radius:20px;font-size:13px;color:#8cffb0}
+.hero{background:linear-gradient(145deg,#151822,#0f1118);border:1px solid #292e3a;border-radius:22px;padding:30px;margin-bottom:25px}
+.hero h1{font-size:34px;margin-bottom:10px}.hero p{color:#9da3b4;margin-bottom:25px}
+.input-area{display:flex;gap:10px}
+input[type=text]{flex:1;padding:16px;background:#0a0c11;border:1px solid #303644;border-radius:12px;color:white;outline:none;font-size:15px}
+input[type=text]:focus{border-color:#7c5cff}
+button{border:none;cursor:pointer;border-radius:12px;padding:0 22px;font-weight:700;color:white;background:#7c5cff}
+button:hover{opacity:.88}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+.card{background:#13161e;border:1px solid #292e3a;border-radius:18px;padding:22px}
+.card h2{font-size:18px;margin-bottom:15px}
+.task{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #242934}
+.task:last-child{border-bottom:none}
+.task input[type=checkbox]{flex:none;width:18px;height:18px}.task span{color:#d8dbe4}
+.report-item{display:flex;justify-content:space-between;padding:10px 0}
+.value{font-weight:bold}.green{color:#78ffab}.yellow{color:#ffd166}
+.response{margin-top:20px;padding:18px;border-radius:14px;background:#0b0d12;border:1px solid #292e3a;display:none}
+.response h3{margin-bottom:8px}.response p{color:#b5bac7;line-height:1.6}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.input-area{flex-direction:column}button{height:48px}}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<div class="logo">🤖 Venky <span>Agent</span></div>
+<div class="status">● Agent Online</div>
+</div>
+
+<section class="hero">
+<h1>What do you want me to do?</h1>
+<p>Your personal AI workspace for study, VNG, learning, research and daily planning.</p>
+<div class="input-area">
+<input id="command" type="text" placeholder="Ask Venky Agent..." onkeydown="if(event.key==='Enter')runAgent()">
+<button onclick="runAgent()">RUN AGENT</button>
+</div>
+<div class="response" id="response">
+<h3>🧠 Agent Response</h3>
+<p id="responseText"></p>
+</div>
+</section>
+
+<div class="grid">
+<div class="card">
+<h2>📋 Today's Tasks</h2>
+<label class="task"><input type="checkbox" onchange="updateReport()"><span>📚 Study Corporate Accounting</span></label>
+<label class="task"><input type="checkbox" onchange="updateReport()"><span>🇩🇪 German — 30 minutes</span></label>
+<label class="task"><input type="checkbox" onchange="updateReport()"><span>💻 VNG development</span></label>
+<label class="task"><input type="checkbox" onchange="updateReport()"><span>🎮 Gaming content planning</span></label>
+<label class="task"><input type="checkbox" onchange="updateReport()"><span>📖 Reading — 20 minutes</span></label>
+</div>
+
+<div class="card">
+<h2>🧩 Agent Modules</h2>
+<div class="task"><span>📚 Study Manager</span></div>
+<div class="task"><span>💻 VNG Assistant</span></div>
+<div class="task"><span>🇩🇪 Germany / German Research</span></div>
+<div class="task"><span>🧠 Learning Manager</span></div>
+<div class="task"><span>💰 Money Planner</span></div>
+</div>
+
+<div class="card">
+<h2>📊 Daily Report</h2>
+<div class="report-item"><span>Completed</span><span class="value green" id="completed">0</span></div>
+<div class="report-item"><span>Pending</span><span class="value yellow" id="pending">5</span></div>
+<div class="report-item"><span>Progress</span><span class="value" id="progress">0%</span></div>
+</div>
+
+<div class="card">
+<h2>⚙️ Agent Architecture</h2>
+<div class="task"><span>👤 User</span></div>
+<div class="task"><span>↓ 🧠 Agent Brain</span></div>
+<div class="task"><span>↓ 📋 Tasks</span></div>
+<div class="task"><span>↓ 🛠️ Tools + Research</span></div>
+<div class="task"><span>↓ ⚡ Action</span></div>
+<div class="task"><span>↓ 📊 Daily Report</span></div>
+</div>
+</div>
+</div>
+
+<script>
+function runAgent(){
+const command=document.getElementById("command").value.trim().toLowerCase();
+const response=document.getElementById("response");
+const responseText=document.getElementById("responseText");
+if(!command){responseText.innerText="Please tell me what you want me to do.";response.style.display="block";return;}
+let message;
+if(command.includes("today")||command.includes("plan"))
+message="Priority plan: Corporate Accounting → German → VNG development → Gaming content → Reading.";
+else if(command.includes("study")||command.includes("exam"))
+message="Study mode activated. Start with the most urgent exam topic, then revise it.";
+else if(command.includes("vng")||command.includes("website")||command.includes("code"))
+message="VNG mode activated. In the next version, connect the project repository for real code analysis and fixes.";
+else if(command.includes("german"))
+message="German mode activated. Daily practice: vocabulary + grammar + speaking.";
+else
+message="Request received. This v1 prototype can plan tasks; the next version will connect real AI, research and action tools.";
+responseText.innerText=message;response.style.display="block";
+}
+function updateReport(){
+const boxes=document.querySelectorAll('.task input[type="checkbox"]');
+let completed=0;boxes.forEach(b=>{if(b.checked)completed++;});
+const total=boxes.length,pending=total-completed,percentage=Math.round(completed/total*100);
+document.getElementById("completed").innerText=completed;
+document.getElementById("pending").innerText=pending;
+document.getElementById("progress").innerText=percentage+"%";
+}
+</script>
+</body>
+</html>
