@@ -48,6 +48,31 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(500, {"error": str(e)})
 
     def do_GET(self):
+        from urllib.parse import urlparse, parse_qs
+        if self.path.startswith("/api/github/files"):
+            try:
+                qs = parse_qs(urlparse(self.path).query)
+                path = qs.get("path", [""])[0]
+                api = "https://api.github.com/repos/venkynova/va/contents/" + path
+                req = Request(api, headers={"Accept":"application/vnd.github+json","User-Agent":"Venky-Agent"})
+                with urlopen(req, timeout=20) as resp:
+                    payload = json.loads(resp.read().decode("utf-8"))
+                self.send_json(200, payload)
+            except Exception as e:
+                self.send_json(502, {"error":"GitHub file read failed: " + str(e)})
+            return
+
+        if self.path == "/api/github/issues":
+            try:
+                api = "https://api.github.com/repos/venkynova/va/issues?state=open&per_page=20"
+                req = Request(api, headers={"Accept":"application/vnd.github+json","User-Agent":"Venky-Agent"})
+                with urlopen(req, timeout=20) as resp:
+                    payload = json.loads(resp.read().decode("utf-8"))
+                self.send_json(200, payload)
+            except Exception as e:
+                self.send_json(502, {"error":"GitHub issues read failed: " + str(e)})
+            return
+
         rel = self.path.split("?", 1)[0].lstrip("/") or "index.html"
         file_path = (ROOT / rel).resolve()
         if ROOT not in file_path.parents and file_path != ROOT:
