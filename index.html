@@ -100,8 +100,33 @@ if(!command){responseText.innerText="Please tell me what you want me to do.";res
 responseText.innerText="🧠 Thinking with local AI...";
 response.style.display="block";
 try{
-const prompt="You are Venky Agent, a practical personal AI assistant. Answer the user's request clearly and helpfully. User request: "+command;
-const message=await VenkyAI.ask(prompt);
+let message;
+if (/github|repository|repo|readme|issues|files/i.test(command)) {
+  if (/issue/i.test(command)) {
+    const res = await fetch("/api/github/issues");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "GitHub issues request failed");
+    message = Array.isArray(data) && data.length
+      ? "Open GitHub issues:\n\n" + data.map(i => "#" + i.number + " — " + i.title).join("\n")
+      : "The va repository has no open issues.";
+  } else {
+    const match = command.match(/(?:file|readme)\s*[:=]?\s*([\w./-]+)?/i);
+    const path = match && match[1] ? match[1] : "";
+    const res = await fetch("/api/github/files?path=" + encodeURIComponent(path));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "GitHub file request failed");
+    if (Array.isArray(data)) {
+      message = "Files in venkynova/va:\n\n" + data.map(x => (x.type === "dir" ? "📁 " : "📄 ") + x.path).join("\n");
+    } else if (data.content) {
+      message = atob(data.content.replace(/\n/g,""));
+    } else {
+      message = JSON.stringify(data, null, 2);
+    }
+  }
+} else {
+  const prompt="You are Venky Agent, a practical personal AI assistant. Answer the user's request clearly and helpfully. User request: "+command;
+  message=await VenkyAI.ask(prompt);
+}
 responseText.innerText=message;
 }catch(error){
 responseText.innerText="Local AI connection failed. Make sure Ollama is running and gemma3:4b is installed. Error: "+error.message;
