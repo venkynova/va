@@ -27,6 +27,38 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        if self.path == "/api/action/github-issue":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = json.loads(self.rfile.read(length).decode("utf-8"))
+                title = str(body.get("title", "")).strip()
+                issue_body = str(body.get("body", "")).strip()
+                if not title:
+                    self.send_json(400, {"error":"Issue title is required."})
+                    return
+                import os
+                token = os.environ.get("GITHUB_TOKEN", "").strip()
+                if not token:
+                    self.send_json(503, {"error":"GITHUB_TOKEN is not configured. Set it in this PowerShell session before using GitHub actions."})
+                    return
+                api = "https://api.github.com/repos/venkynova/va/issues"
+                payload = json.dumps({"title":title,"body":issue_body}).encode("utf-8")
+                req = Request(api, data=payload, headers={
+                    "Accept":"application/vnd.github+json",
+                    "Authorization":"Bearer " + token,
+                    "User-Agent":"Venky-Agent",
+                    "Content-Type":"application/json"
+                }, method="POST")
+                with urlopen(req, timeout=20) as resp:
+                    result = json.loads(resp.read().decode("utf-8"))
+                self.send_json(200, {"ok":True,"number":result.get("number"),"url":result.get("html_url"),"title":result.get("title")})
+            except HTTPError as e:
+                detail = e.read().decode("utf-8", errors="replace")
+                self.send_json(e.code, {"error":"GitHub action failed: " + detail})
+            except Exception as e:
+                self.send_json(500, {"error":"GitHub action failed: " + str(e)})
+            return
+    def do_POST(self):
         if self.path != "/api/chat":
             self.send_error(404)
             return
