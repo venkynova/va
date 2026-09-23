@@ -26,8 +26,8 @@ button:hover{opacity:.88}
 .task input[type=checkbox]{flex:none;width:18px;height:18px}.task span{color:#d8dbe4}
 .report-item{display:flex;justify-content:space-between;padding:10px 0}
 .value{font-weight:bold}.green{color:#78ffab}.yellow{color:#ffd166}
-.response{margin-top:20px;padding:18px;border-radius:14px;background:#0b0d12;border:1px solid #292e3a;display:none}
-.response h3{margin-bottom:8px}.response p{color:#b5bac7;line-height:1.6}
+.response{margin-top:20px;padding:18px;border-radius:14px;background:#0b0d12;border:1px solid #292e3a;display:none;white-space:pre-wrap}
+.response h3{margin-bottom:8px}.response p{color:#b5bac7;line-height:1.6;white-space:pre-wrap}
 @media(max-width:700px){.grid{grid-template-columns:1fr}.input-area{flex-direction:column}button{height:48px}}
 </style>
 </head>
@@ -42,9 +42,9 @@ button:hover{opacity:.88}
 
 <section class="hero">
 <h1>What do you want me to do?</h1>
-<p>Your personal AI workspace for study, VNG, learning, research and daily planning.</p>
+<p>Your personal AI workspace for study, VNG, learning, research and Unreal Engine control.</p>
 <div class="input-area">
-<input id="command" type="text" placeholder="Ask Venky Agent..." onkeydown="if(event.key==='Enter')runAgent()">
+<input id="command" type="text" placeholder="Ask Venky Agent... e.g. /unrealengine create cube" onkeydown="if(event.key==='Enter')runAgent()">
 <button onclick="runAgent()">RUN AGENT</button>
 </div>
 <div id="actionBox" style="display:none;margin-top:14px;padding:14px;border:1px solid #5a4bc4;border-radius:12px;background:#11131b">
@@ -75,6 +75,7 @@ button:hover{opacity:.88}
 <div class="task"><span>🇩🇪 Germany / German Research</span></div>
 <div class="task"><span>🧠 Learning Manager</span></div>
 <div class="task"><span>💰 Money Planner</span></div>
+<div class="task"><span>🎮 /unrealengine — Unreal Controller</span></div>
 </div>
 
 <div class="card">
@@ -90,105 +91,297 @@ button:hover{opacity:.88}
 <div class="task"><span>↓ 🧠 Agent Brain</span></div>
 <div class="task"><span>↓ 📋 Tasks</span></div>
 <div class="task"><span>↓ 🛠️ Tools + Research</span></div>
-<div class="task"><span>↓ ⚡ Action</span></div>
+<div class="task"><span>↓ ⚡ Action Router</span></div>
+<div class="task"><span>↓ 🎮 Unreal Control Bridge</span></div>
 <div class="task"><span>↓ 📊 Daily Report</span></div>
 </div>
 </div>
 </div>
 
 <script>
+let pendingAction = null;
+
 async function runAgent(){
 const command=document.getElementById("command").value.trim();
 const response=document.getElementById("response");
 const responseText=document.getElementById("responseText");
-if(!command){responseText.innerText="Please tell me what you want me to do.";response.style.display="block";return;}
-responseText.innerText="🧠 Thinking with local AI...";
+if(!command){
+  responseText.innerText="Please tell me what you want me to do.";
+  response.style.display="block";
+  return;
+}
+responseText.innerText="🧠 Thinking...";
 response.style.display="block";
+
 try{
-let message;
-if (/create (a )?(github )?issue|open (a )?(github )?issue/i.test(command)) {
-  const parsed = parseGithubIssueCommand(command);
-  if (!parsed.title) throw new Error("I need an issue title. Example: Create a GitHub issue: Fix login bug");
-  pendingAction = {type:"github-issue", title:parsed.title, body:parsed.body};
-  document.getElementById("actionPreview").innerHTML = "<b>⚡ GitHub Action</b><br>Create issue in <b>venkynova/va</b><br><br><b>Title:</b> " + escapeHtml(parsed.title) + "<br><b>Body:</b> " + escapeHtml(parsed.body || "(empty)") + "<br><br>Nothing will be changed until you press <b>CONFIRM ACTION</b>.";
-  document.getElementById("actionBox").style.display="block";
-  message = "I prepared the GitHub issue. Please review it and confirm the action.";
-} else if (/research|search|look up|find out/i.test(command)) {
-  const q = command.replace(/^(research|search|look up|find out)\s*/i, "").trim() || command;
-  const res = await fetch("/api/research?q=" + encodeURIComponent(q));
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Research request failed");
-  const sourceText = (data.results || []).map(x => x.title + ": " + x.snippet).join("\n");
-  message = sourceText ? "Research results for: " + data.query + "\n\n" + sourceText : "No research results found.";
-  try {
-    const summary = await VenkyAI.ask("Summarize these research results in clear bullet points. Mention that they are search snippets, not full source verification.\n\n" + sourceText);
-    message += "\n\n🧠 AI Summary\n" + summary;
-  } catch (_) {}
-} else if (/github|repository|repo|readme|issues|files/i.test(command)) {
-  if (/issue/i.test(command)) {
-    const res = await fetch("/api/github/issues");
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "GitHub issues request failed");
-    message = Array.isArray(data) && data.length
-      ? "Open GitHub issues:\n\n" + data.map(i => "#" + i.number + " — " + i.title).join("\n")
-      : "The va repository has no open issues.";
-  } else {
-    const match = command.match(/(?:file|readme)\s*[:=]?\s*([\w./-]+)?/i);
-    const path = match && match[1] ? match[1] : "";
-    const res = await fetch("/api/github/files?path=" + encodeURIComponent(path));
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "GitHub file request failed");
-    if (Array.isArray(data)) {
-      message = "Files in venkynova/va:\n\n" + data.map(x => (x.type === "dir" ? "📁 " : "📄 ") + x.path).join("\n");
-    } else if (data.content) {
-      message = atob(data.content.replace(/\n/g,""));
-    } else {
-      message = JSON.stringify(data, null, 2);
+  let message;
+
+  if (/^\/unrealengine\b/i.test(command)) {
+    const parsed = parseUnrealCommand(command);
+
+    if (!parsed) {
+      throw new Error(
+        "Try: /unrealengine health | create cube | create sphere | move VenkyCube to 300 0 100 | delete VenkyCube | list | play | stop"
+      );
     }
+
+    if (parsed.needsConfirmation) {
+      pendingAction = parsed.action;
+      document.getElementById("actionPreview").innerHTML =
+        "<b>🎮 Unreal Engine Action</b><br>" +
+        escapeHtml(parsed.description) +
+        "<br><br>Nothing will change until you press <b>CONFIRM ACTION</b>.";
+      document.getElementById("actionBox").style.display="block";
+      message = "I prepared the Unreal Engine action. Review it and press CONFIRM ACTION.";
+    } else {
+      const res = await fetch("/api/unreal/command", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(parsed.action)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unreal command failed");
+      message = formatUnrealResult(data);
+    }
+
+  } else if (/create (a )?(github )?issue|open (a )?(github )?issue/i.test(command)) {
+    const parsed = parseGithubIssueCommand(command);
+    if (!parsed.title) throw new Error("I need an issue title. Example: Create a GitHub issue: Fix login bug");
+
+    pendingAction = {type:"github-issue", title:parsed.title, body:parsed.body};
+    document.getElementById("actionPreview").innerHTML =
+      "<b>⚡ GitHub Action</b><br>Create issue in <b>venkynova/va</b><br><br>" +
+      "<b>Title:</b> " + escapeHtml(parsed.title) +
+      "<br><b>Body:</b> " + escapeHtml(parsed.body || "(empty)") +
+      "<br><br>Nothing will be changed until you press <b>CONFIRM ACTION</b>.";
+    document.getElementById("actionBox").style.display="block";
+    message = "I prepared the GitHub issue. Review it and confirm the action.";
+
+  } else if (/research|search|look up|find out/i.test(command)) {
+    const q = command.replace(/^(research|search|look up|find out)\s*/i, "").trim() || command;
+    const res = await fetch("/api/research?q=" + encodeURIComponent(q));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Research request failed");
+
+    const sourceText = (data.results || []).map(x => x.title + ": " + x.snippet).join("\n");
+    message = sourceText
+      ? "Research results for: " + data.query + "\n\n" + sourceText
+      : "No research results found.";
+
+    try {
+      const summary = await VenkyAI.ask(
+        "Summarize these research results in clear bullet points. Mention that they are search snippets, not full source verification.\n\n" + sourceText
+      );
+      message += "\n\n🧠 AI Summary\n" + summary;
+    } catch (_) {}
+
+  } else if (/github|repository|repo|readme|issues|files/i.test(command)) {
+    if (/issue/i.test(command)) {
+      const res = await fetch("/api/github/issues");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "GitHub issues request failed");
+
+      message = Array.isArray(data) && data.length
+        ? "Open GitHub issues:\n\n" + data.map(i => "#" + i.number + " — " + i.title).join("\n")
+        : "The va repository has no open issues.";
+    } else {
+      const match = command.match(/(?:file|readme)\s*[:=]?\s*([\w./-]+)?/i);
+      const path = match && match[1] ? match[1] : "";
+      const res = await fetch("/api/github/files?path=" + encodeURIComponent(path));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "GitHub file request failed");
+
+      if (Array.isArray(data)) {
+        message = "Files in venkynova/va:\n\n" + data.map(x => (x.type === "dir" ? "📁 " : "📄 ") + x.path).join("\n");
+      } else if (data.content) {
+        message = atob(data.content.replace(/\n/g,""));
+      } else {
+        message = JSON.stringify(data, null, 2);
+      }
+    }
+
+  } else {
+    const prompt =
+      "You are Venky Agent, a practical personal AI assistant. Answer the user's request clearly and helpfully. User request: " +
+      command;
+    message = await VenkyAI.ask(prompt);
   }
-} else {
-  const prompt="You are Venky Agent, a practical personal AI assistant. Answer the user's request clearly and helpfully. User request: "+command;
-  message=await VenkyAI.ask(prompt);
-}
-responseText.innerText=message;
+
+  responseText.innerText = message;
 }catch(error){
-responseText.innerText="Local AI connection failed. Make sure Ollama is running and gemma3:4b is installed. Error: "+error.message;
+  responseText.innerText = "⚠️ " + error.message;
 }
 }
-let pendingAction = null;
+
+function parseUnrealCommand(command){
+  const text = command.replace(/^\/unrealengine\b/i,"").trim();
+
+  if (!text || /^(health|status|connected|connection)$/i.test(text)) {
+    return {
+      needsConfirmation:false,
+      action:{action:"health"},
+      description:"Check the Unreal Engine bridge connection."
+    };
+  }
+
+  if (/^(list|list actors|actors)$/i.test(text)) {
+    return {
+      needsConfirmation:false,
+      action:{action:"list_actors"},
+      description:"List actors in the current Unreal level."
+    };
+  }
+
+  if (/^(play|start)$/i.test(text)) {
+    return {
+      needsConfirmation:true,
+      action:{action:"play"},
+      description:"Start Play in Editor (PIE)."
+    };
+  }
+
+  if (/^(stop|end|stop play)$/i.test(text)) {
+    return {
+      needsConfirmation:true,
+      action:{action:"stop"},
+      description:"Stop the current Play in Editor session."
+    };
+  }
+
+  const create = text.match(/^create\s+(?:a\s+)?(cube|sphere|cylinder|plane)(?:\s+named\s+(.+))?$/i);
+  if (create) {
+    const primitive = create[1][0].toUpperCase() + create[1].slice(1).toLowerCase();
+    const name = (create[2] || "").trim();
+    const finalName = name || primitive + "_Venky";
+    return {
+      needsConfirmation:true,
+      action:{
+        action:"create_actor",
+        primitive,
+        name:finalName,
+        location:[0,0,100]
+      },
+      description:"Create a " + primitive + " named " + finalName + " at [0, 0, 100]."
+    };
+  }
+
+  const move = text.match(/^move\s+(.+?)\s+to\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)$/i);
+  if (move) {
+    const name = move[1].trim();
+    const location = [Number(move[2]),Number(move[3]),Number(move[4])];
+    return {
+      needsConfirmation:true,
+      action:{action:"move_actor",name,location},
+      description:"Move actor " + name + " to [" + location.join(", ") + "]."
+    };
+  }
+
+  const del = text.match(/^(?:delete|remove)\s+(.+)$/i);
+  if (del) {
+    const name = del[1].trim();
+    return {
+      needsConfirmation:true,
+      action:{action:"delete_actor",name},
+      description:"Delete actor " + name + " from the current level."
+    };
+  }
+
+  return null;
+}
+
+function formatUnrealResult(data){
+  if (!data) return "Unreal bridge returned no data.";
+  if (data.ok === false) return "⚠️ Unreal: " + (data.error || "Command failed.");
+
+  if (data.action === "health" || data.service === "VenkyUnrealBridge") {
+    return "✅ Unreal Engine connected.\nBridge: 127.0.0.1:" + (data.port || 8765);
+  }
+
+  if (data.action === "create_actor") {
+    return "✅ Created " + (data.primitive || "actor") + " — " + (data.name || data.object_name || "Unnamed");
+  }
+
+  if (data.action === "move_actor") {
+    return "✅ Moved actor — " + (data.name || "unknown");
+  }
+
+  if (data.action === "delete_actor") {
+    return "✅ Deleted actor — " + (data.name || "unknown");
+  }
+
+  if (data.action === "play") return "✅ Play in Editor requested.";
+  if (data.action === "stop") return "✅ Stop Play in Editor requested.";
+
+  if (Array.isArray(data.actors)) {
+    return "🎮 Actors in current level (" + data.actors.length + "):\n\n" +
+      data.actors.map(a => "• " + a.name + " — " + a.class).join("\n");
+  }
+
+  return JSON.stringify(data, null, 2);
+}
+
 function escapeHtml(value){
-  return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  return String(value).replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[ch]));
 }
+
 function parseGithubIssueCommand(command){
   let text=command.replace(/^(create|open)\s+(a\s+)?(github\s+)?issue\s*[:\-]?\s*/i,"").trim();
   if(!text) return {title:"",body:""};
   const parts=text.split(/\s+(?:because|description|body)\s*[:\-]?\s+/i);
   return {title:parts[0].trim(),body:parts.slice(1).join(" ").trim()};
 }
+
 async function confirmPendingAction(){
   if(!pendingAction) return;
   const btn=document.getElementById("confirmAction");
-  btn.disabled=true; btn.innerText="RUNNING...";
+  btn.disabled=true;
+  btn.innerText="RUNNING...";
+
   try{
-    const res=await fetch("/api/action/github-issue",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(pendingAction)});
+    let endpoint="/api/unreal/command";
+    let body=pendingAction;
+
+    if (pendingAction.type === "github-issue") {
+      endpoint="/api/action/github-issue";
+      body=pendingAction;
+    }
+
+    const res=await fetch(endpoint,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(body)
+    });
     const data=await res.json();
     if(!res.ok) throw new Error(data.error || "Action failed");
-    document.getElementById("responseText").innerText="✅ GitHub issue created: #" + data.number + "\n" + data.title + "\n" + data.url;
+
+    document.getElementById("responseText").innerText =
+      pendingAction.type === "github-issue"
+        ? "✅ GitHub issue created: #" + data.number + "\n" + data.title + "\n" + data.url
+        : formatUnrealResult(data);
+
     document.getElementById("actionBox").style.display="none";
     pendingAction=null;
+    btn.disabled=false;
+    btn.innerText="CONFIRM ACTION";
   }catch(error){
     document.getElementById("responseText").innerText="⚠️ Action not completed: " + error.message;
-    btn.disabled=false; btn.innerText="CONFIRM ACTION";
+    btn.disabled=false;
+    btn.innerText="CONFIRM ACTION";
   }
 }
+
 function cancelPendingAction(){
   pendingAction=null;
   document.getElementById("actionBox").style.display="none";
-  document.getElementById("responseText").innerText="Action cancelled. No GitHub changes were made.";
+  document.getElementById("responseText").innerText="Action cancelled. No change was made.";
 }
+
 function updateReport(){
 const boxes=document.querySelectorAll('.task input[type="checkbox"]');
-let completed=0;boxes.forEach(b=>{if(b.checked)completed++;});
+let completed=0;
+boxes.forEach(b=>{if(b.checked)completed++;});
 const total=boxes.length,pending=total-completed,percentage=Math.round(completed/total*100);
 document.getElementById("completed").innerText=completed;
 document.getElementById("pending").innerText=pending;
