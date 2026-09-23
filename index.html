@@ -47,6 +47,11 @@ button:hover{opacity:.88}
 <input id="command" type="text" placeholder="Ask Venky Agent..." onkeydown="if(event.key==='Enter')runAgent()">
 <button onclick="runAgent()">RUN AGENT</button>
 </div>
+<div id="actionBox" style="display:none;margin-top:14px;padding:14px;border:1px solid #5a4bc4;border-radius:12px;background:#11131b">
+  <div id="actionPreview" style="color:#d8dbe4;line-height:1.5"></div>
+  <button id="confirmAction" onclick="confirmPendingAction()" style="height:42px;margin-top:12px">CONFIRM ACTION</button>
+  <button onclick="cancelPendingAction()" style="height:42px;margin-top:12px;background:#2a2f3b">CANCEL</button>
+</div>
 <div class="response" id="response">
 <h3>🧠 Agent Response</h3>
 <p id="responseText"></p>
@@ -101,7 +106,14 @@ responseText.innerText="🧠 Thinking with local AI...";
 response.style.display="block";
 try{
 let message;
-if (/research|search|look up|find out/i.test(command)) {
+if (/create (a )?(github )?issue|open (a )?(github )?issue/i.test(command)) {
+  const parsed = parseGithubIssueCommand(command);
+  if (!parsed.title) throw new Error("I need an issue title. Example: Create a GitHub issue: Fix login bug");
+  pendingAction = {type:"github-issue", title:parsed.title, body:parsed.body};
+  document.getElementById("actionPreview").innerHTML = "<b>⚡ GitHub Action</b><br>Create issue in <b>venkynova/va</b><br><br><b>Title:</b> " + escapeHtml(parsed.title) + "<br><b>Body:</b> " + escapeHtml(parsed.body || "(empty)") + "<br><br>Nothing will be changed until you press <b>CONFIRM ACTION</b>.";
+  document.getElementById("actionBox").style.display="block";
+  message = "I prepared the GitHub issue. Please review it and confirm the action.";
+} else if (/research|search|look up|find out/i.test(command)) {
   const q = command.replace(/^(research|search|look up|find out)\s*/i, "").trim() || command;
   const res = await fetch("/api/research?q=" + encodeURIComponent(q));
   const data = await res.json();
@@ -142,6 +154,37 @@ responseText.innerText=message;
 }catch(error){
 responseText.innerText="Local AI connection failed. Make sure Ollama is running and gemma3:4b is installed. Error: "+error.message;
 }
+}
+let pendingAction = null;
+function escapeHtml(value){
+  return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function parseGithubIssueCommand(command){
+  let text=command.replace(/^(create|open)\s+(a\s+)?(github\s+)?issue\s*[:\-]?\s*/i,"").trim();
+  if(!text) return {title:"",body:""};
+  const parts=text.split(/\s+(?:because|description|body)\s*[:\-]?\s+/i);
+  return {title:parts[0].trim(),body:parts.slice(1).join(" ").trim()};
+}
+async function confirmPendingAction(){
+  if(!pendingAction) return;
+  const btn=document.getElementById("confirmAction");
+  btn.disabled=true; btn.innerText="RUNNING...";
+  try{
+    const res=await fetch("/api/action/github-issue",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(pendingAction)});
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error || "Action failed");
+    document.getElementById("responseText").innerText="✅ GitHub issue created: #" + data.number + "\n" + data.title + "\n" + data.url;
+    document.getElementById("actionBox").style.display="none";
+    pendingAction=null;
+  }catch(error){
+    document.getElementById("responseText").innerText="⚠️ Action not completed: " + error.message;
+    btn.disabled=false; btn.innerText="CONFIRM ACTION";
+  }
+}
+function cancelPendingAction(){
+  pendingAction=null;
+  document.getElementById("actionBox").style.display="none";
+  document.getElementById("responseText").innerText="Action cancelled. No GitHub changes were made.";
 }
 function updateReport(){
 const boxes=document.querySelectorAll('.task input[type="checkbox"]');
