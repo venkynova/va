@@ -32,6 +32,8 @@ button:hover{opacity:.88}
 </style>
 </head>
 <body>
+<script>window.VENKY_CONFIG={provider:"ollama",endpoint:"http://localhost:11434",model:"gemma3:4b"};</script>
+<script src="app.js"></script>
 <div class="container">
 <div class="header">
 <div class="logo">🤖 Venky <span>Agent</span></div>
@@ -90,23 +92,20 @@ button:hover{opacity:.88}
 </div>
 
 <script>
-function runAgent(){
-const command=document.getElementById("command").value.trim().toLowerCase();
+async function runAgent(){
+const command=document.getElementById("command").value.trim();
 const response=document.getElementById("response");
 const responseText=document.getElementById("responseText");
 if(!command){responseText.innerText="Please tell me what you want me to do.";response.style.display="block";return;}
-let message;
-if(command.includes("today")||command.includes("plan"))
-message="Priority plan: Corporate Accounting → German → VNG development → Gaming content → Reading.";
-else if(command.includes("study")||command.includes("exam"))
-message="Study mode activated. Start with the most urgent exam topic, then revise it.";
-else if(command.includes("vng")||command.includes("website")||command.includes("code"))
-message="VNG mode activated. In the next version, connect the project repository for real code analysis and fixes.";
-else if(command.includes("german"))
-message="German mode activated. Daily practice: vocabulary + grammar + speaking.";
-else
-message="Request received. This v1 prototype can plan tasks; the next version will connect real AI, research and action tools.";
-responseText.innerText=message;response.style.display="block";
+responseText.innerText="🧠 Thinking with local AI...";
+response.style.display="block";
+try{
+const prompt="You are Venky Agent, a practical personal AI assistant. Answer the user's request clearly and helpfully. User request: "+command;
+const message=await VenkyAI.ask(prompt);
+responseText.innerText=message;
+}catch(error){
+responseText.innerText="Local AI connection failed. Make sure Ollama is running and gemma3:4b is installed. Error: "+error.message;
+}
 }
 function updateReport(){
 const boxes=document.querySelectorAll('.task input[type="checkbox"]');
